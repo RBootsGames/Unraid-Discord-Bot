@@ -7,7 +7,6 @@
 .env
 MouseMoveCheck.py
 testing.py
-.test
 
 # User-specific files
 *.rsuser
