@@ -2,7 +2,7 @@
  Basic Unraid command line controls from Discord
 
 
-All the user variables that need to be changed before use need to be in a file called '.env'.
+All the user variables that need to be changed need to be in a file called '.env'. The .env file should be in the same location as the bot python script.
 
 The .env file should look like this:
 
