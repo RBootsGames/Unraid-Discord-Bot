@@ -210,11 +210,69 @@ async def SendMessage(message):
     pass
 
 async def BashCommand(command, outputToNull=False, sendMessageWithOutput=True):
-    if outputToNull: command = f"{command}> /dev/null"
+    # create a tmux sessions if it doesn't exist
+    # print(0)
+    subprocess.Popen("tmux new -s discordenv -d > /dev/null 2>&1", shell=True, universal_newlines=True).communicate()
+    # print(1)
+    # append command for tmux session
+    command = "tmux send-keys -t discordenv '" + command + "' Enter"
+    # print(2)
+
+    outputPath = "/tmp/discordenv"
+    # print(3)
+    # start tmux output redirect
+    subprocess.Popen("tmux pipe-pane -t discordenv 'cat > " + outputPath + "'", shell=True, universal_newlines=True).communicate()
+    # print(4)
     
-    proc = subprocess.Popen(command, shell=True, universal_newlines=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    subprocess.Popen(command, shell=True, universal_newlines=True)
+    # print(5)
+
+    await asyncio.sleep(.5)
+    # wait until command is done running by checking modified time on the output file
+    lastMod = os.path.getmtime(outputPath)
+    while True:
+        await asyncio.sleep(.5)
+        newMod = os.path.getmtime(outputPath)
+        if lastMod == newMod:
+            break
+        else:
+            lastMod = newMod
+            # print(lastMod)
+        pass
+    # print(6)
     
-    out, err = proc.communicate()
+    # stop tmux output redirect
+    subprocess.Popen("tmux pipe-pane -t discordenv", shell=True, universal_newlines=True).communicate()
+    # print(7)
+
+
+    rawOut = open(outputPath, "r").readlines()
+    rawOut = rawOut[1:]
+    if rawOut[-1][-1] == ' ' and rawOut[-1][-2] == '#':
+        rawOut = rawOut[:-1]
+        # print("removed last line")
+    out = ""
+    # remove all formating characters
+    removing = False
+    for line in rawOut:
+        removing = False
+        for c in range(len(line)):
+            if not removing and line[c] == '':
+                removing = True
+            
+            if not removing:
+                out += line[c]
+
+            if removing and line[c] == 'm':
+                removing = False
+
+    # print(rawOut)
+    err = ""
+    # if outputToNull: command = f"{command}> /dev/null"
+    
+    # proc = subprocess.Popen(command, shell=True, universal_newlines=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+    # out, err = proc.communicate()
 
     try:
         if not outputToNull:
@@ -250,7 +308,8 @@ async def BashCommand(command, outputToNull=False, sendMessageWithOutput=True):
         print("\nerror:")
         print(repr(err))
     
-    return out, err
+    # print("command done")
+    # return out, err
 
 ############# Commands #############
 
@@ -368,6 +427,7 @@ async def RawCommand(command):
 
 async def ListVM():
     await BashCommand('virsh list --all')
+    print("executed")
     if len(wolPCs) > 0:
         pcResults = " \nPhysical Computers\n--------------------------------"
         # Check if physical computers are on.
@@ -496,12 +556,19 @@ async def CheckPhoneExistence(pingIP:str):
 def Main():
     closedByError = False
     try:
+        # subprocess.Popen("tmux new -s discordenv \; detach", shell=True, universal_newlines=True).communicate()
+
+        # subprocess.Popen("tmux new -As discordenv \; detach", shell=True, universal_newlines=True).communicate()
         client.run(TOKEN)
     except KeyboardInterrupt: pass
     except:
         closedByError = True
 
     print("closed")
+
+    # subprocess.Popen("tmux kill-session -t discordenv", shell=True, universal_newlines=True).communicate()
+    # print("closed discordenv tmux session")
+
 
     try:
         pcSocket.close()
